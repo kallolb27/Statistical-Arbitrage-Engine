@@ -9,14 +9,12 @@
 
 using namespace std;
 
-// Represents a single directional exchange rate
 struct Edge {
     int src;
     int dest;
     double weight;
 };
 
-// Encapsulates the entire graph and Bellman-Ford logic
 class ArbitrageEngine {
 private:
     int V;
@@ -27,7 +25,6 @@ private:
 public:
     ArbitrageEngine() : V(0) {}
 
-    // 1. Data Ingestion
     bool loadMarketData(istream& input) {
         string line, src_str, dest_str, rate_str;
         int node_count = 0;
@@ -61,36 +58,28 @@ public:
     int getVertexCount() const { return V; }
     int getEdgeCount() const { return edges.size(); }
 
-    // 2. Core Algorithm Execution
     bool findNegativeCycle(vector<int>& cycle) {
         if (V == 0) return false;
 
-        const double INF = 1e9;
-        vector<double> dist(V, INF);
+        vector<double> dist(V, 0.0);
         vector<int> parent(V, -1);
-        
-        dist[0] = 0.0;
+        int cycle_start = -1;
+        const double EPSILON = 1e-12;
 
-        // V - 1 relaxations
-        for (int i = 0; i < V - 1; i++) {
+        // Run V full passes updating parent in each, break early if converged
+        for (int i = 0; i < V; i++) {
+            cycle_start = -1;
             for (const auto& edge : edges) {
-                if (dist[edge.src] != INF && dist[edge.src] + edge.weight < dist[edge.dest]) {
+                if (dist[edge.src] + edge.weight < dist[edge.dest] - EPSILON) {
                     dist[edge.dest] = dist[edge.src] + edge.weight;
                     parent[edge.dest] = edge.src;
+                    cycle_start = edge.dest;
                 }
             }
-        }
-
-        // V-th iteration to trip the alarm
-        int cycle_start = -1;
-        for (const auto& edge : edges) {
-            if (dist[edge.src] != INF && dist[edge.src] + edge.weight < dist[edge.dest]) {
-                cycle_start = edge.dest;
-                break;
+            if (cycle_start == -1) {
+                return false; // No negative cycle detected
             }
         }
-
-        if (cycle_start == -1) return false;
 
         // Walk back V times to guarantee we are inside the negative cycle
         for (int i = 0; i < V; i++) {
@@ -108,9 +97,7 @@ public:
         return true;
     }
 
-    // 3. Profit Calculation and Output
     void printExecutionPathAndProfit(const vector<int>& cycle) {
-        // Reverse to get chronological trade order
         vector<int> exec_order;
         for (int i = cycle.size() - 1; i >= 0; i--) {
             exec_order.push_back(cycle[i]);
@@ -123,7 +110,6 @@ public:
         }
         cout << "\n";
 
-        // Calculate compounded net yield across the loop
         double total_log_weight = 0.0;
         for (size_t i = 0; i + 1 < exec_order.size(); i++) {
             int u = exec_order[i];
@@ -144,19 +130,15 @@ public:
     }
 };
 
-#include <fstream> 
-
 int main(int argc, char* argv[]) {
     ios_base::sync_with_stdio(false);
     cin.tie(NULL);
 
     ArbitrageEngine engine;
     
-    // Default to reading from the live pipe (standard input)
     istream* input_stream = &cin;
     ifstream file_stream;
 
-    // If a filename is passed as a command-line argument, read from the file instead
     if (argc > 1) {
         file_stream.open(argv[1]);
         if (!file_stream.is_open()) {
@@ -166,10 +148,9 @@ int main(int argc, char* argv[]) {
         input_stream = &file_stream;
         cout << "Reading market data from file: " << argv[1] << "\n";
     } else {
-        cout << "Listening for live market data stream..." << "\n";
+        cout << "Listening for market data stream..." << "\n";
     }
 
-    // Dereference the pointer to pass the correct stream to the engine
     if (!engine.loadMarketData(*input_stream)) {
         cout << "No market data received." << "\n";
         return 1;
@@ -185,7 +166,7 @@ int main(int argc, char* argv[]) {
     auto end_time = chrono::high_resolution_clock::now();
 
     if (has_arbitrage) {
-        cout << "Arbitrage cycle detected! Executing trades..." << "\n";
+        cout << "Arbitrage cycle detected!" << "\n";
         auto duration = chrono::duration_cast<chrono::microseconds>(end_time - start_time).count();
         cout << "Engine Latency: " << duration << " microseconds." << "\n";
         
